@@ -1,12 +1,13 @@
 import uvicorn
 from fastapi import FastAPI, WebSocket
+from fastapi.openapi import docs
 
 from fastapi_ws_docs_demo.connection_manager import ConnectionManager
 from fastapi_ws_docs_demo.openapi_schema import custom_openapi, get_websocket_endpoints
 from fastapi_ws_docs_demo.websocket_handlers import WebSocketHandlers
 
 # Create FastAPI app
-app = FastAPI(title="FastAPI WebSocket Demo", version="1.0.0")
+app = FastAPI(title="FastAPI WebSocket Demo", version="1.0.0", docs_url=None)
 
 # Initialize connection manager and handlers
 manager = ConnectionManager()
@@ -14,6 +15,20 @@ ws_handlers = WebSocketHandlers(manager)
 
 # Set custom OpenAPI schema
 app.openapi = lambda: custom_openapi(app)
+
+def get_swagger_ui_html():
+    return docs.get_swagger_ui_html(
+        openapi_url="/openapi.json",
+        title="FastAPI WebSocket Demo - API",
+        swagger_ui_parameters={
+            "syntaxHighlight.theme": "obsidian",
+            "docExpansion": "none",
+        },
+    )
+
+@app.get("/docs", include_in_schema=False)
+def custom_swagger_ui_html():
+    return get_swagger_ui_html()
 
 @app.get("/")
 async def read_root():

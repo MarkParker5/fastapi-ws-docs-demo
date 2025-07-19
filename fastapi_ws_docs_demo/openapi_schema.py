@@ -3,11 +3,12 @@ from typing import List
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from starlette.routing import WebSocketRoute
+from typing_extensions import Callable
 
 from .openapi_ws_utils import get_openapi_ws
 
 
-def custom_openapi(app: FastAPI):
+def custom_openapi(app: FastAPI, inject: Callable[[], dict] | None = None):
     """Generate custom OpenAPI schema with WebSocket support"""
     if app.openapi_schema:
         return app.openapi_schema
@@ -33,7 +34,9 @@ def custom_openapi(app: FastAPI):
         ws_routes=ws_routes,
     )
 
-    openapi_schema = merge(openapi_schema.copy(), ws_openapi.copy())
+    openapi_schema = merge(openapi_schema.copy(), ws_openapi)
+    if inject:
+        openapi_schema = merge(openapi_schema.copy(), inject().copy())
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 

@@ -15,6 +15,7 @@ from fastapi.routing import APIRouter
 from typing_extensions import Union
 
 from fastapi_ws_docs_demo.connection_manager import ConnectionManager
+from fastapi_ws_docs_demo.message_endpoints import add_ws_message_endpoints
 from fastapi_ws_docs_demo.models import (
     BodyModel,
     ErrorMessage,
@@ -25,7 +26,15 @@ from fastapi_ws_docs_demo.openapi_schema import custom_openapi
 from fastapi_ws_docs_demo.websocket_handlers import WebSocketHandlers
 
 app = FastAPI(title="FastAPI WebSocket Demo", version="1.0.0", docs_url=None)
-app.openapi = lambda: custom_openapi(app) # Set custom OpenAPI schema
+app.openapi = lambda: custom_openapi(app, inject = lambda: add_ws_message_endpoints(
+    send = [
+        HelloMessage
+    ],
+    receive = [
+        ResponseMessage,
+        ErrorMessage
+    ]
+)) # Set custom OpenAPI schema
 
 # Initialize connection manager and handlers
 manager = ConnectionManager()
@@ -86,3 +95,4 @@ app.include_router(ws_router)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+# https://github.com/OAI/OpenAPI-Specification/issues/55#issuecomment-1975876095

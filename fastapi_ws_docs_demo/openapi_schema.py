@@ -2,28 +2,9 @@ from typing import List
 
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
+from starlette.routing import WebSocketRoute
 
-
-def get_websocket_endpoints(app: FastAPI) -> List[dict]:
-    """Get all WebSocket endpoints from the FastAPI app"""
-    websocket_endpoints = []
-
-    for route in app.routes:
-        if not hasattr(route, 'path') or not hasattr(route, 'endpoint'):
-            continue
-        if not (hasattr(route, 'route_class') and 'websocket' in str(route.route_class).lower()) and \
-           not route.path.startswith('/ws') and \
-           'websocket' not in str(route.endpoint).lower():
-            continue
-
-        description = getattr(route.endpoint, '__doc__', None) or f"WebSocket endpoint at {route.path}"
-        websocket_endpoints.append({
-            "path": route.path,
-            "endpoint": route.endpoint.__name__ if hasattr(route.endpoint, '__name__') else str(route.endpoint),
-            "description": description.strip()
-        })
-
-    return websocket_endpoints
+from .openapi_ws_utils import get_openapi_ws
 
 
 def custom_openapi(app: FastAPI):
@@ -38,32 +19,36 @@ def custom_openapi(app: FastAPI):
         routes=app.routes,
     )
 
-    # Ensure OpenAPI version is set
-    openapi_schema["openapi"] = "3.0.2"
+    # WS:
 
-    # Add WebSocket routes to the schema automatically
-    ws_endpoints = get_websocket_endpoints(app)
+    ws_routes: List[WebSocketRoute] = [
+        route for route in getattr(app, "routes", [])
+        if isinstance(route, WebSocketRoute)
+    ]
 
-    for endpoint in ws_endpoints:
-        # Default responses
-        default_responses = {
-            "101": {
-                "description": "Switching Protocols - WebSocket connection established"
-            },
-            "400": {
-                "description": "Bad Request - Invalid WebSocket request"
-            }
-        }
+    ws_openapi = get_openapi_ws(
+        title="",
+        version="",
+        description="",
+        ws_routes=ws_routes,
+    )
 
-        openapi_schema["paths"][endpoint["path"]] = {
-            "get": {
-                "summary": endpoint['endpoint'].replace('_', ' ').title(),
-                "description": endpoint['description'],
-                "tags": ["WebSocket"],
-                "operationId": f"websocket_connect_{endpoint['endpoint']}",
-                "responses": default_responses
-            }
-        }
-
+    openapi_schema = merge(openapi_schema.copy(), ws_openapi.copy())
     app.openapi_schema = openapi_schema
     return app.openapi_schema
+
+def merge(a: dict, b: dict, path=[]):
+    for key in b:
+        if key in a:
+            if isinstance(a[key], dict) and isinstance(b[key], dict):
+                merge(a[key], b[key], path + [str(key)])
+            elif a[key] != b[key]:
+                if not a[key]:
+                    a[key] = b[key]
+                elif not b[key]:
+                    pass # keep a[key]
+                else:
+                    raise Exception('Conflict at "' + '.'.join(path + [str(key)]) + '". Values are: "' + str(a[key]) + '" and "' + str(b[key]) + '"')
+        else:
+            a[key] = b[key]
+    return a

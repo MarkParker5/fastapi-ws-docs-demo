@@ -1,20 +1,35 @@
+from typing import Optional
+
 import uvicorn
-from fastapi import FastAPI, WebSocket
+from fastapi import (
+    Body,
+    Cookie,
+    FastAPI,
+    Header,
+    Path,
+    Query,
+    WebSocket,
+)
 from fastapi.openapi import docs
+from fastapi.routing import APIRouter
+from typing_extensions import Union
 
 from fastapi_ws_docs_demo.connection_manager import ConnectionManager
-from fastapi_ws_docs_demo.openapi_schema import custom_openapi, get_websocket_endpoints
+from fastapi_ws_docs_demo.models import (
+    BodyModel,
+    ErrorMessage,
+    HelloMessage,
+    ResponseMessage,
+)
+from fastapi_ws_docs_demo.openapi_schema import custom_openapi
 from fastapi_ws_docs_demo.websocket_handlers import WebSocketHandlers
 
-# Create FastAPI app
 app = FastAPI(title="FastAPI WebSocket Demo", version="1.0.0", docs_url=None)
+app.openapi = lambda: custom_openapi(app) # Set custom OpenAPI schema
 
 # Initialize connection manager and handlers
 manager = ConnectionManager()
 ws_handlers = WebSocketHandlers(manager)
-
-# Set custom OpenAPI schema
-app.openapi = lambda: custom_openapi(app)
 
 def get_swagger_ui_html():
     return docs.get_swagger_ui_html(
@@ -34,28 +49,40 @@ def custom_swagger_ui_html():
 async def read_root():
     return {"message": "FastAPI WebSocket Demo", "docs": "/docs", "websocket": "/ws"}
 
-@app.websocket("/ws")
+api_router = APIRouter(tags=['API'])
+
+@api_router.get("/api")
+async def read_api():
+    return {"message": "FastAPI WebSocket Demo", "docs": "/docs", "websocket": "/ws"}
+
+ws_router = APIRouter(tags=["WS"])
+
+@ws_router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time hello world communication. Send JSON messages with type 'hello' and receive responses."""
     await ws_handlers.handle_websocket_endpoint(websocket)
 
-@app.websocket("/ws-2")
-async def websocket_endpoint(websocket: WebSocket, param1: str, param2: int):
+@ws_router.websocket("/ws-schemas-demo/{path_param}")
+async def websocket_endpoint_2(
+    websocket: WebSocket,
+    path_param: int = Path(..., description='Path parameter'),
+    query_param: Optional[str] = Query(None, description='Query parameter'),
+    header_param: Optional[str] = Header(None, convert_underscores=False),
+    cookie_param: Optional[str] = Cookie(None),
+    body_param: BodyModel = Body(...),
+    # form_param: Optional[str] = Form(None),
+    # file_param: Optional[UploadFile] = File(None)
+) -> Union[
+    HelloMessage,
+    ResponseMessage,
+    ErrorMessage,
+    None
+]:
     """WS with some parameters"""
     await ws_handlers.handle_websocket_endpoint(websocket)
 
+app.include_router(api_router)
+app.include_router(ws_router)
+
 if __name__ == "__main__":
-    # Print all WebSocket endpoints
-    ws_endpoints = get_websocket_endpoints(app)
-    print("WebSocket Endpoints:")
-    print("=" * 50)
-    for endpoint in ws_endpoints:
-        print(f"Path: {endpoint['path']}")
-        print(f"Endpoint: {endpoint['endpoint']}")
-        print(f"Description: {endpoint['description']}")
-        print("-" * 30)
-
-    if not ws_endpoints:
-        print("No WebSocket endpoints found")
-
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

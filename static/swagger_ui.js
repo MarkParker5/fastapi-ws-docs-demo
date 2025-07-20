@@ -436,7 +436,7 @@ const socketEventsPlugin = function (system) {
           React.createElement(
             "div",
             {
-              class: "opblock opblock-get",
+              class: "opblock opblock-head", // TODO: diff color based on status from `socketStatusMarker`
               id: `operations-tag-WS_connection_state-${url}`,
             },
             React.createElement(
@@ -539,6 +539,9 @@ const socketEventsPlugin = function (system) {
                 method = "receive";
                 break;
             }
+          } else if (path.startsWith("/ws") && method === "head") {
+            // TODO: check by ws: or wss: or x-ws-endpoint / x-ws-message markers
+            method = "connect";
           }
 
           props.operationProps = props.operationProps.set("method", method);

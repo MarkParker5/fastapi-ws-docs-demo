@@ -47,7 +47,7 @@ class SuperWSApiRouteWrapper(routing.APIWebSocketRoute):
         # generate some metadata
 
         self.tags = ["Web Socket",]
-        self.methods = {'GET'}
+        self.methods = {'HEAD'}
         self.status_code = 101
         self.response_class = Response
         self.response_description = 'Switching Protocols'
@@ -98,6 +98,7 @@ class SuperWSApiRouteWrapper(routing.APIWebSocketRoute):
                     "model": sub_model,
                     "name": f"Response_{self.unique_id}_{i}",
                     "description": sub_model.__name__,
+                    "x-ws-endpoint": True,
                     "content": {
                         "application/json": {
                             "schema": sub_model.schema(),

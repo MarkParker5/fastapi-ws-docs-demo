@@ -5,12 +5,14 @@ from typing_extensions import Optional
 
 
 class HelloMessage(BaseModel):
+    '''Welcome Message'''
     type: str = "hello"
     message: str
     timestamp: datetime | None = None
 
 
 class ResponseMessage(BaseModel):
+    '''Wow, someone reached back'''
     type: str = "response"
     response_to: str
     message: str
@@ -18,6 +20,7 @@ class ResponseMessage(BaseModel):
 
 
 class ErrorMessage(BaseModel):
+    '''Oops, something went wrong'''
     type: str = "error"
     error: str
     details: str

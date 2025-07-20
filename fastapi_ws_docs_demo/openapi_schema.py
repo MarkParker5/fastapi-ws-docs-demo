@@ -36,7 +36,9 @@ def custom_openapi(app: FastAPI, inject: Callable[[], dict] | None = None):
 
     openapi_schema = merge(openapi_schema.copy(), ws_openapi)
     if inject:
-        openapi_schema = merge(openapi_schema.copy(), inject().copy())
+        schema = inject()
+        print(schema)
+        openapi_schema = merge(openapi_schema.copy(), schema)
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 

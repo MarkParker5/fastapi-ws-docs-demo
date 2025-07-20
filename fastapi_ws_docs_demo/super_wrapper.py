@@ -46,7 +46,7 @@ class SuperWSApiRouteWrapper(routing.APIWebSocketRoute):
 
         # generate some metadata
 
-        self.tags = ["WebSocket",]
+        self.tags = ["Web Socket",]
         self.methods = {'GET'}
         self.status_code = 101
         self.response_class = Response

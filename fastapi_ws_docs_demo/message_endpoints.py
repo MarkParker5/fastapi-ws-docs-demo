@@ -17,12 +17,16 @@ def get_schema_for_model(method: str, model: BaseModel, endpoint: str, tag: str)
                         "schema": model.schema()
                     }
                 }
-            },
+            } if method == 'post' else {},
             "responses": {
                 "200": {
-                    "description": "OK"
+                    "content": {
+                        "application/json": {
+                            "schema": model.schema(),
+                        }
+                    }
                 }
-            }
+            } if method == 'get' else {},
         }
     }
 

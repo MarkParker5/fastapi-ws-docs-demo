@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 import uvicorn
 from fastapi import (
@@ -11,8 +11,9 @@ from fastapi import (
     WebSocket,
 )
 from fastapi.openapi import docs
+from fastapi.responses import HTMLResponse
 from fastapi.routing import APIRouter
-from typing_extensions import Union
+from fastapi.staticfiles import StaticFiles
 
 from fastapi_ws_docs_demo.connection_manager import ConnectionManager
 from fastapi_ws_docs_demo.message_endpoints import add_ws_message_endpoints
@@ -36,6 +37,9 @@ app.openapi = lambda: custom_openapi(app, inject = lambda: add_ws_message_endpoi
     ]
 )) # Set custom OpenAPI schema
 
+# Mount static files for custom Swagger UI
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # Initialize connection manager and handlers
 manager = ConnectionManager()
 ws_handlers = WebSocketHandlers(manager)
@@ -50,9 +54,14 @@ def get_swagger_ui_html():
         },
     )
 
-@app.get("/docs", include_in_schema=False)
-def custom_swagger_ui_html():
+@app.get("/docs", include_in_schema=True)
+def native_swagger_ui_html():
     return get_swagger_ui_html()
+
+@app.get("/wsdocs", include_in_schema=True)
+def custom_ws_swagger_ui_html():
+    with open("templates/swagger_ui.html") as f:
+        return HTMLResponse(content=f.read())
 
 @app.get("/")
 async def read_root():
@@ -88,11 +97,14 @@ async def websocket_endpoint_2(
     None
 ]:
     """WS with some parameters"""
-    await ws_handlers.handle_websocket_endpoint(websocket)
+    pass
 
 app.include_router(api_router)
 app.include_router(ws_router)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+# TODO:
+# 1. proper urls for ws endpoints
+# 2. custom swagger UI like here:
 # https://github.com/OAI/OpenAPI-Specification/issues/55#issuecomment-1975876095

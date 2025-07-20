@@ -17,8 +17,9 @@ class WebSocketHandlers:
 
         # Send welcome message
         welcome_msg = ResponseMessage(
+            response_to='user',
             message="Welcome to FastAPI WebSocket Demo! Send a hello message.",
-            timestamp=datetime.now()
+            timestamp=datetime.now(),
         )
         await self.manager.send_personal_message(welcome_msg.model_dump_json(), websocket)
 
@@ -34,14 +35,16 @@ class WebSocketHandlers:
 
                 except json.JSONDecodeError:
                     error_msg = ErrorMessage(
-                        message="Invalid JSON format",
+                        error="Invalid JSON format",
+                        details="unavailable",
                         timestamp=datetime.now()
                     )
                     await self.manager.send_personal_message(error_msg.model_dump_json(), websocket)
 
                 except Exception as e:
                     error_msg = ErrorMessage(
-                        message=f"Error processing message: {str(e)}",
+                        error=f"Error processing message: {str(e)}",
+                        details="unavailable",
                         timestamp=datetime.now()
                     )
                     await self.manager.send_personal_message(error_msg.model_dump_json(), websocket)
@@ -59,7 +62,8 @@ class WebSocketHandlers:
         else:
             # Handle unknown message type
             error_msg = ErrorMessage(
-                message=f"Unknown message type: {message_type}",
+                error=f"Unknown message type: {message_type}",
+                details="unavailable",
                 timestamp=datetime.now()
             )
             await self.manager.send_personal_message(error_msg.model_dump_json(), websocket)
@@ -71,6 +75,7 @@ class WebSocketHandlers:
 
         # Create response
         response = ResponseMessage(
+            response_to="user",
             message=f"Hello back! You said: {hello_msg.message}",
             timestamp=datetime.now()
         )
@@ -80,6 +85,7 @@ class WebSocketHandlers:
 
         # Broadcast to all clients
         broadcast_msg = ResponseMessage(
+            response_to="all",
             message=f"User said hello: {hello_msg.message}",
             timestamp=datetime.now()
         )

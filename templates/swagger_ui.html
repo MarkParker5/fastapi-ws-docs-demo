@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>FastAPI WebSocket Demo - Custom Swagger UI</title>
+        <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui.css" />
+        <style>
+            html,
+            body {
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            #swagger-ui {
+                min-height: 100vh;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="swagger-ui"></div>
+        <div id="app"></div>
+        <script src="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui-bundle.js"></script>
+        <script src="https://unpkg.com/swagger-ui-dist@4.15.5/swagger-ui-standalone-preset.js"></script>
+        <script src="/static/swagger_ui.js"></script>
+        <!-- <script>
+            window.onload = function () {
+                const ui = SwaggerUIBundle({
+                    url: "/openapi.json",
+                    dom_id: "#swagger-ui",
+                    deepLinking: true,
+                    presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+                    layout: "StandaloneLayout",
+                    docExpansion: "none",
+                    syntaxHighlight: { theme: "obsidian" },
+                    plugins: window.swaggerCustomPlugins ? window.swaggerCustomPlugins : [],
+                    // You may need to pass additional parameters for your custom plugin here
+                });
+                window.ui = ui;
+            };
+        </script> -->
+    </body>
+</html>

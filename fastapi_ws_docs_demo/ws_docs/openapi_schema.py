@@ -1,17 +1,36 @@
 import inspect
 from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Set,
     Tuple,
+    Union,
     get_args,
     get_origin,
 )
 
-from fastapi import Response, routing
+from fastapi import FastAPI, Response, routing
 from fastapi.dependencies.utils import (
     get_body_field,
     get_dependant,
     get_flat_dependant,
     get_parameterless_sub_dependant,
     get_typed_return_annotation,
+)
+from fastapi.encoders import jsonable_encoder
+from fastapi.openapi.models import OpenAPI
+from fastapi.openapi.utils import (
+    REF_TEMPLATE,
+    GenerateJsonSchema,
+    get_compat_model_name_map,
+    get_definitions,
+    get_fields_from_routes,
+    get_openapi,
+    get_openapi_path,
 )
 from fastapi.routing import (
     APIRoute,
@@ -27,9 +46,128 @@ from pydantic.utils import (  # type: ignore[no-redef]
     lenient_issubclass as lenient_issubclass,  # noqa: F401
 )
 from pydantic_core.core_schema import ModelField
+from starlette.routing import WebSocketRoute
 from starlette.types import Scope
-from typing_extensions import Union
 
+
+def custom_openapi(app: FastAPI, inject: Callable[[], dict] | None = None):
+    """Generate custom OpenAPI schema with WebSocket support"""
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title="FastAPI WebSocket Demo",
+        version="1.0.0",
+        description="This is a FastAPI WebSocket demo with custom OpenAPI schema",
+        routes=app.routes,
+    )
+
+    # WS:
+
+    ws_routes: List[WebSocketRoute] = [
+        route for route in getattr(app, "routes", [])
+        if isinstance(route, WebSocketRoute)
+    ]
+
+    ws_openapi = get_openapi_ws(
+        title="",
+        version="",
+        description="",
+        ws_routes=ws_routes,
+    )
+
+    openapi_schema = merge(openapi_schema.copy(), ws_openapi)
+    if inject:
+        openapi_schema = merge(openapi_schema.copy(), inject())
+    openapi_schema['openapi'] = '3.0.0'
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+def merge(a: dict, b: dict, path=[]):
+    for key in b:
+        if key in a:
+            if isinstance(a[key], dict) and isinstance(b[key], dict):
+                merge(a[key], b[key], path + [str(key)])
+            elif a[key] != b[key]:
+                if not a[key]:
+                    a[key] = b[key]
+                elif not b[key]:
+                    pass # keep a[key]
+                else:
+                    raise Exception('Conflict at "' + '.'.join(path + [str(key)]) + '". Values are: "' + str(a[key]) + '" and "' + str(b[key]) + '"')
+        else:
+            a[key] = b[key]
+    return a
+
+def get_openapi_ws(
+    *,
+    title: str,
+    version: str,
+    openapi_version: str = "3.1.0",
+    summary: Optional[str] = None,
+    description: Optional[str] = None,
+    ws_routes: Sequence[WebSocketRoute],
+    tags: Optional[List[Dict[str, Any]]] = None,
+    servers: Optional[List[Dict[str, Union[str, Any]]]] = None,
+    terms_of_service: Optional[str] = None,
+    contact: Optional[Dict[str, Union[str, Any]]] = None,
+    license_info: Optional[Dict[str, Union[str, Any]]] = None,
+) -> Dict[str, Any]:
+
+    ws_routes = [SuperWSApiRouteWrapper(route) for route in ws_routes]
+
+    info: Dict[str, Any] = {"title": title, "version": version}
+    if summary:
+        info["summary"] = summary
+    if description:
+        info["description"] = description
+    if terms_of_service:
+        info["termsOfService"] = terms_of_service
+    if contact:
+        info["contact"] = contact
+    if license_info:
+        info["license"] = license_info
+    output: Dict[str, Any] = {"openapi": openapi_version, "info": info}
+    if servers:
+        output["servers"] = servers
+
+    components: Dict[str, Dict[str, Any]] = {}
+    ws_paths: Dict[str, Dict[str, Any]] = {}
+    operation_ids: Set[str] = set()
+    all_fields = get_fields_from_routes(list(ws_routes or []))
+    model_name_map = get_compat_model_name_map(all_fields)
+    schema_generator = GenerateJsonSchema(ref_template=REF_TEMPLATE)
+
+    field_mapping, definitions = get_definitions(
+        fields=all_fields,
+        schema_generator=schema_generator,
+        model_name_map=model_name_map,
+        separate_input_output_schemas=True,
+    )
+
+    for ws_route in ws_routes or []:
+        result = get_openapi_path(
+            route=ws_route,
+            operation_ids=operation_ids,
+            schema_generator=schema_generator,
+            model_name_map=model_name_map,
+            field_mapping=field_mapping,
+            separate_input_output_schemas=True,
+        )
+        if result:
+            path, _, path_definitions = result
+            if path:
+                ws_paths.setdefault(ws_route.path_format, {}).update(path)
+            if path_definitions:
+                definitions.update(path_definitions)
+    if definitions:
+        components["schemas"] = {k: definitions[k] for k in sorted(definitions)}
+    if components:
+        output["components"] = components
+    output["paths"] = ws_paths
+    if tags:
+        output["tags"] = tags
+    return jsonable_encoder(OpenAPI(**output), by_alias=True, exclude_none=True)  # type: ignore
 
 class SuperWSApiRouteWrapper(routing.APIWebSocketRoute):
     def __init__(self, route: routing.APIWebSocketRoute) -> None:

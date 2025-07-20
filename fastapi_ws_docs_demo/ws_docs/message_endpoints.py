@@ -3,7 +3,22 @@ import inspect
 from pydantic import BaseModel
 
 
-def get_schema_for_model(method: str, model: BaseModel, endpoint: str, tag: str) -> tuple[str, dict]:
+def add_ws_message_endpoints(
+    send: list[BaseModel],
+    receive: list[BaseModel],
+    endpoint: str ="/ws",
+    tag: str = "Web Socket",
+) -> dict: # json openapi endpoints
+    paths: dict[str, dict] = {}
+    for model in send:
+        paths.update([_get_schema_for_model("post", model, endpoint, tag)])
+    for model in receive:
+        paths.update([_get_schema_for_model("get", model, endpoint, tag)])
+    return {
+        "paths": paths
+    }
+
+def _get_schema_for_model(method: str, model: BaseModel, endpoint: str, tag: str) -> tuple[str, dict]:
     return f'{endpoint}::{model.__name__}', {
         method: {
             "x-ws-message": True,
@@ -28,19 +43,4 @@ def get_schema_for_model(method: str, model: BaseModel, endpoint: str, tag: str)
                 }
             } if method == 'get' else {},
         }
-    }
-
-def add_ws_message_endpoints(
-    send: list[BaseModel],
-    receive: list[BaseModel],
-    endpoint: str ="/ws",
-    tag: str = "Web Socket",
-) -> dict: # json openapi endpoints
-    paths: dict[str, dict] = {}
-    for model in send:
-        paths.update([get_schema_for_model("post", model, endpoint, tag)])
-    for model in receive:
-        paths.update([get_schema_for_model("get", model, endpoint, tag)])
-    return {
-        "paths": paths
     }

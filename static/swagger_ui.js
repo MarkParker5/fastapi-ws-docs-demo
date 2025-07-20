@@ -245,7 +245,7 @@ const socketEventsPlugin = function (system) {
       WsResponse: ({ event, response, getConfigs }) => {
         const { React, fn, getComponent } = system;
 
-        const HighlightCode = getComponent("highlightCode");
+        const ResponseBody = getComponent("responseBody");
 
         // Defensive check for response and getIn
         if (!response || typeof response.getIn !== "function") {
@@ -262,7 +262,6 @@ const socketEventsPlugin = function (system) {
         }
 
         const schema = activeMediaType.get("schema");
-        const sampleResponse = schema ? JSON.stringify(schema, null, 2) : "No schema available";
 
         return React.createElement(
           "tr",
@@ -548,11 +547,11 @@ const socketEventsPlugin = function (system) {
       responses:
         (Original, { React }) =>
         (props) => {
-          const { path } = props;
-          if (_isWs(path)) {
-            const WsResponses = system.getComponent("WsResponses");
-            return React.createElement(WsResponses, props);
-          }
+          // const { path } = props;
+          // if (_isWs(path)) {
+          //   const WsResponses = system.getComponent("WsResponses");
+          //   return React.createElement(WsResponses, props);
+          // }
           return React.createElement(Original, props);
         },
     },

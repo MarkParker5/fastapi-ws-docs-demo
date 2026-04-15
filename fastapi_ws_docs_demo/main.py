@@ -32,16 +32,15 @@ ws_handlers = WebSocketHandlers(manager)
 
 # DOCS
 
-app.openapi = lambda: custom_openapi(app, inject = lambda: add_ws_message_endpoints(
-    # add ws messages as standalone endpoints (alternative to ws endpoint responses)
-    send = [
-        HelloMessage
-    ],
-    receive = [
-        ResponseMessage,
-        ErrorMessage
-    ]
-)) # Set custom OpenAPI schema
+app.openapi = lambda: custom_openapi(
+    app,
+    inject=lambda: add_ws_message_endpoints(
+        # add ws messages as standalone endpoints (alternative to ws endpoint responses)
+        send=[HelloMessage],
+        receive=[ResponseMessage, ErrorMessage],
+    ),
+)  # Set custom OpenAPI schema
+
 
 @app.get("/docs", include_in_schema=True)
 def native_swagger_ui_html():
@@ -54,51 +53,63 @@ def native_swagger_ui_html():
         },
     )
 
-# Mount static files for custom Swagger UI
+
+# Mount static files for custom ws-tuned Swagger UI
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 @app.get("/wsdocs", include_in_schema=True)
 def custom_ws_swagger_ui_html():
     with open("templates/swagger_ui.html") as f:
         return HTMLResponse(content=f.read())
 
+
 # ENDPOINTS
+
 
 @app.get("/")
 async def read_root():
+    """Plain HTTP endpoint for testing purposes."""
     return {"message": "FastAPI WebSocket Demo", "docs": "/docs", "websocket": "/ws"}
 
-api_router = APIRouter(tags=['API']) # routers are just for testing purposes; they don't affect ws docs work.
+
+api_router = APIRouter(tags=["API"])  # routers are just for testing purposes; they don't affect ws docs work.
+
 
 @api_router.get("/api")
 async def read_api():
+    """Plain HTTP endpoint for testing purposes."""
     return {"message": "FastAPI WebSocket Demo", "docs": "/docs", "websocket": "/ws"}
 
-ws_router = APIRouter(tags=["WS"]) # tags don't work with ws endpoints; they always have Web Sockets tag unless other is passed to the schema generator
+
+ws_router = APIRouter(
+    tags=["WS"]
+)  # tags don't work with ws endpoints; they always have Web Sockets tag unless other is passed to the schema generator; a separate ws router is not required for docs to work
+
 
 @ws_router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for real-time hello world communication. Send JSON messages with type 'hello' and receive responses."""
+    """Primary demo WebSocket endpoint. Accepts JSON messages with type 'hello' and sends back response or error messages."""
     await ws_handlers.handle_websocket_endpoint(websocket)
+
 
 @ws_router.websocket("/ws-schemas-demo/{path_param}")
 async def websocket_endpoint_2(
     websocket: WebSocket,
-    path_param: int = Path(..., description='Path parameter'),
-    query_param: Optional[str] = Query(None, description='Query parameter'),
+    path_param: int = Path(..., description="Path parameter"),
+    query_param: Optional[str] = Query(None, description="Query parameter"),
     header_param: Optional[str] = Header(None, convert_underscores=False),
     cookie_param: Optional[str] = Cookie(None),
     body_param: BodyModel = Body(...),
     # form_param: Optional[str] = Form(None),
     # file_param: Optional[UploadFile] = File(None)
-) -> Union[ # this will display all message schemas as responses
-    HelloMessage,
-    ResponseMessage,
-    ErrorMessage,
-    None
+) -> Union[  # this will display all message schemas as responses
+    HelloMessage, ResponseMessage, ErrorMessage, None
 ]:
-    """WS with some parameters"""
+    """Demo WebSocket endpoint showing that WS docs work with all FastAPI parameter types: path, query, header, cookie, and body."""
     pass
+
 
 app.include_router(api_router)
 app.include_router(ws_router)

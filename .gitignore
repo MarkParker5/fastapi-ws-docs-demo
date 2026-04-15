@@ -147,3 +147,4 @@ Thumbs.db
 # FastAPI specific
 .pytest_cache/
 test-reports/
+.zed

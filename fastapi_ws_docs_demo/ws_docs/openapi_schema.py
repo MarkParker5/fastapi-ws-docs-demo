@@ -51,23 +51,32 @@ from starlette.types import Scope
 
 
 def custom_openapi(app: FastAPI, inject: Callable[[], dict] | None = None):
-    """Generate custom OpenAPI schema with WebSocket support"""
+    """
+    Build and cache the OpenAPI schema for the app with full WebSocket support.
+    Generates the base schema for all HTTP and WS routes, then merges it with the schema provided by `inject` (intended for message-endpoint schemas from `add_ws_message_endpoints`).
+    """
+
     if app.openapi_schema:
         return app.openapi_schema
 
     openapi_schema = get_openapi(
         title="FastAPI WebSocket Demo",
         version="1.0.0",
-        description="This is a FastAPI WebSocket demo with custom OpenAPI schema",
+        description=(
+            "This is a FastAPI WebSocket-Docs demo:<ol>"
+            "<li>It adds websocket endpoints to the docs; Messages are passed through the response types - all in native docs, semi-automatically.</li>"
+            "<li>It also (optionally, via the inject function and a passed list of pydantic ws messages) allows you to show each websocket message as a separate route in docs (/ws::MyMessage), marking receiving and sending with get/post methods respectively. Still in the native docs.</li>"
+            "<li>It also provides customized frontend for docs that render websocket messages better, and also allows testing (sending and receiving) websocket messages directly from the docs!</li>"
+            "</ol>"
+            "Normal docs at <a href='/docs'>Native Docs Frontend</a> </br>"
+            "Customized docs at <a href='/wsdocs'>WebSocket Docs</a>"
+        ),
         routes=app.routes,
     )
 
     # WS:
 
-    ws_routes: List[WebSocketRoute] = [
-        route for route in getattr(app, "routes", [])
-        if isinstance(route, WebSocketRoute)
-    ]
+    ws_routes: List[WebSocketRoute] = [route for route in getattr(app, "routes", []) if isinstance(route, WebSocketRoute)]
 
     ws_openapi = get_openapi_ws(
         title="",
@@ -79,11 +88,16 @@ def custom_openapi(app: FastAPI, inject: Callable[[], dict] | None = None):
     openapi_schema = merge(openapi_schema.copy(), ws_openapi)
     if inject:
         openapi_schema = merge(openapi_schema.copy(), inject())
-    openapi_schema['openapi'] = '3.0.0'
+    openapi_schema["openapi"] = "3.0.0"
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
+
 def merge(a: dict, b: dict, path=[]):
+    """
+    Merge two OpenAPI schemas, raising an exception if there are conflicts.
+    Used to merge the main REST HTTP OpenAPI schema with the WebSocket schema.
+    """
     for key in b:
         if key in a:
             if isinstance(a[key], dict) and isinstance(b[key], dict):
@@ -92,12 +106,13 @@ def merge(a: dict, b: dict, path=[]):
                 if not a[key]:
                     a[key] = b[key]
                 elif not b[key]:
-                    pass # keep a[key]
+                    pass  # keep a[key]
                 else:
-                    raise Exception('Conflict at "' + '.'.join(path + [str(key)]) + '". Values are: "' + str(a[key]) + '" and "' + str(b[key]) + '"')
+                    raise Exception('Conflict at "' + ".".join(path + [str(key)]) + '". Values are: "' + str(a[key]) + '" and "' + str(b[key]) + '"')
         else:
             a[key] = b[key]
     return a
+
 
 def get_openapi_ws(
     *,
@@ -113,6 +128,12 @@ def get_openapi_ws(
     contact: Optional[Dict[str, Union[str, Any]]] = None,
     license_info: Optional[Dict[str, Union[str, Any]]] = None,
 ) -> Dict[str, Any]:
+    """
+    Generate an OpenAPI schema fragment covering all WebSocket endpoints as routes.
+
+    Each route is wrapped with `SuperWSApiRouteWrapper` so FastAPI's standard
+    `get_openapi_path` processes it alongside regular HTTP routes.
+    """
 
     ws_routes = [SuperWSApiRouteWrapper(route) for route in ws_routes]
 
@@ -169,7 +190,13 @@ def get_openapi_ws(
         output["tags"] = tags
     return jsonable_encoder(OpenAPI(**output), by_alias=True, exclude_none=True)  # type: ignore
 
+
 class SuperWSApiRouteWrapper(routing.APIWebSocketRoute):
+    """
+    Wraps an `APIWebSocketRoute` to make it appear as a regular `APIRoute` so
+    FastAPI's `get_openapi_path` processes it and includes it in the OpenAPI schema.
+    """
+
     def __init__(self, route: routing.APIWebSocketRoute) -> None:
 
         self.dependency_overrides_provider = None
@@ -184,21 +211,23 @@ class SuperWSApiRouteWrapper(routing.APIWebSocketRoute):
 
         # generate some metadata
 
-        self.tags = ["Web Socket",]
-        self.methods = {'HEAD'}
+        self.tags = [
+            "Web Socket",
+        ]
+        self.methods = {"HEAD"}
         self.status_code = 101
         self.response_class = Response
-        self.response_description = 'Switching Protocols'
+        self.response_description = "Switching Protocols"
 
         self.include_in_schema = True
-        self.description = self.summary = inspect.cleandoc(self.endpoint.__doc__ or '')
+        self.description = self.summary = inspect.cleandoc(self.endpoint.__doc__ or "")
         self.generate_unique_id_function = generate_unique_id
         self.unique_id = self.operation_id = self.generate_unique_id_function(self)
 
         self.callbacks = []
         self.openapi_extra = None
         self.deprecated = False
-        self._embed_body_fields = True # _should_embed_body_fields(self._flat_dependant.body_params)
+        self._embed_body_fields = True  # _should_embed_body_fields(self._flat_dependant.body_params)
 
         # self.response_model_by_alias = True
         # self.response_model_exclude_unset = False
@@ -212,7 +241,7 @@ class SuperWSApiRouteWrapper(routing.APIWebSocketRoute):
             response_model = return_annotation
 
         self.response_model = response_model
-        if self.response_model:# and is_body_allowed_for_status_code(self.status_code):
+        if self.response_model:  # and is_body_allowed_for_status_code(self.status_code):
             self.response_field = create_response_field(
                 name="Response_" + self.unique_id,
                 type_=self.response_model,
@@ -232,7 +261,7 @@ class SuperWSApiRouteWrapper(routing.APIWebSocketRoute):
                 if not issubclass(sub_model, BaseModel):
                     continue
                 i += 1
-                responses[2000+i] = {
+                responses[2000 + i] = {
                     "model": sub_model,
                     "name": f"Response_{self.unique_id}_{i}",
                     "description": sub_model.__name__,
@@ -241,7 +270,7 @@ class SuperWSApiRouteWrapper(routing.APIWebSocketRoute):
                         "application/json": {
                             "schema": sub_model.schema(),
                         }
-                    }
+                    },
                 }
 
         self.responses = responses
@@ -271,9 +300,10 @@ class SuperWSApiRouteWrapper(routing.APIWebSocketRoute):
     def matches(self, scope: Scope) -> Tuple[Match, Scope]:
         match, child_scope = super().matches(scope)
         if match != Match.NONE:
-            child_scope['route'] = self
+            child_scope["route"] = self
         return match, child_scope
 
     @property
-    def __class__(self): # fake isinstance to pass filters
+    def __class__(self):
+        # fake isinstance to pass filters, without this the route is not recognized as an API route and is not added to the OpenAPI schema
         return APIRoute

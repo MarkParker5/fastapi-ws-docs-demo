@@ -689,11 +689,12 @@ const requestInterceptor = (request, ...args) => {
 };
 
 const ui = SwaggerUIBundle({
-  url: "/openapi.json",
+  url: window.OPENAPI_URL || "/openapi.json",
   dom_id: "#swagger-ui",
   presets: [SwaggerUIBundle.presets.apis],
   plugins,
   layout: "BaseLayout",
+  validatorUrl: false,
   requestInterceptor,
   responseInterceptor,
   ...swaggerSettings,

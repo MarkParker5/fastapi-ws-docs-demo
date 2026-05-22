@@ -14,6 +14,7 @@ from typing import (
 )
 
 from fastapi import FastAPI, Response, routing
+from fastapi._compat import lenient_issubclass as lenient_issubclass  # noqa: F401
 from fastapi.dependencies.utils import (
     get_body_field,
     get_dependant,
@@ -26,6 +27,7 @@ from fastapi.openapi.models import OpenAPI
 from fastapi.openapi.utils import (
     REF_TEMPLATE,
     GenerateJsonSchema,
+    ModelField,
     get_compat_model_name_map,
     get_definitions,
     get_fields_from_routes,
@@ -38,7 +40,7 @@ from fastapi.routing import (
 )
 from fastapi.utils import (
     create_cloned_field,
-    create_response_field,
+    create_model_field,
     generate_unique_id,
 )
 from pydantic import BaseModel
@@ -60,17 +62,9 @@ def custom_openapi(app: FastAPI, inject: Callable[[], dict] | None = None):
         return app.openapi_schema
 
     openapi_schema = get_openapi(
-        title="FastAPI WebSocket Demo",
-        version="1.0.0",
-        description=(
-            "This is a FastAPI WebSocket-Docs demo:<ol>"
-            "<li>It adds websocket endpoints to the docs; Messages are passed through the response types - all in native docs, semi-automatically.</li>"
-            "<li>It also (optionally, via the inject function and a passed list of pydantic ws messages) allows you to show each websocket message as a separate route in docs (/ws::MyMessage), marking receiving and sending with get/post methods respectively. Still in the native docs.</li>"
-            "<li>It also provides customized frontend for docs that render websocket messages better, and also allows testing (sending and receiving) websocket messages directly from the docs!</li>"
-            "</ol>"
-            "Normal docs at <a href='/docs'>Native Docs Frontend</a> </br>"
-            "Customized docs at <a href='/wsdocs'>WebSocket Docs</a>"
-        ),
+        title=app.title,
+        version=app.version,
+        description=app.description,
         routes=app.routes,
     )
 
@@ -242,7 +236,7 @@ class SuperWSApiRouteWrapper(routing.APIWebSocketRoute):
 
         self.response_model = response_model
         if self.response_model:  # and is_body_allowed_for_status_code(self.status_code):
-            self.response_field = create_response_field(
+            self.response_field = create_model_field(
                 name="Response_" + self.unique_id,
                 type_=self.response_model,
                 mode="serialization",
@@ -281,7 +275,7 @@ class SuperWSApiRouteWrapper(routing.APIWebSocketRoute):
             model = response.get("model")
             if model:
                 response_name = response.get("name", f"Response_{additional_status_code}_{self.unique_id}")
-                response_field = create_response_field(name=response_name, type_=model)
+                response_field = create_model_field(name=response_name, type_=model)
                 response_fields[additional_status_code] = response_field
 
         if response_fields:
@@ -295,7 +289,7 @@ class SuperWSApiRouteWrapper(routing.APIWebSocketRoute):
                 0,
                 get_parameterless_sub_dependant(depends=depends, path=self.path_format),
             )
-        self.body_field = get_body_field(dependant=self.dependant, name=self.unique_id)
+        self.body_field = get_body_field(flat_dependant=self._flat_dependant, name=self.unique_id, embed_body_fields=self._embed_body_fields)
 
     def matches(self, scope: Scope) -> Tuple[Match, Scope]:
         match, child_scope = super().matches(scope)

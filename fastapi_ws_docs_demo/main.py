@@ -26,7 +26,20 @@ from fastapi_ws_docs_demo.domain.websocket_handlers import WebSocketHandlers
 from fastapi_ws_docs_demo.ws_docs.message_endpoints import add_ws_message_endpoints
 from fastapi_ws_docs_demo.ws_docs.openapi_schema import custom_openapi
 
-app = FastAPI(title="FastAPI WebSocket Demo", version="1.0.0", docs_url=None)
+app = FastAPI(
+    title="FastAPI WebSocket Demo",
+    version="1.0.0",
+    docs_url=None,
+    description=(
+        "This is a FastAPI WebSocket-Docs demo:<ol>"
+        "<li>It adds websocket endpoints to the docs; Messages are passed through the response types - all in native docs, semi-automatically.</li>"
+        "<li>It also (optionally, via the inject function and a passed list of pydantic ws messages) allows you to show each websocket message as a separate route in docs (/ws::MyMessage), marking receiving and sending with get/post methods respectively. Still in the native docs.</li>"
+        "<li>It also provides customized frontend for docs that render websocket messages better, and also allows testing (sending and receiving) websocket messages directly from the docs!</li>"
+        "</ol>"
+        "Normal docs at <a href='/docs'>Native Docs Frontend</a> </br>"
+        "Customized docs at <a href='/wsdocs'>WebSocket Docs</a>"
+    ),
+)
 manager = ConnectionManager()
 ws_handlers = WebSocketHandlers(manager)
 
